@@ -122,14 +122,46 @@ action:
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'on' }}"
-          ...
+          - condition: template
+            value_template: >
+              {{ automation_blocker is not defined or
+                 (automation_blocker_boolean and states(automation_blocker) == 'on') or
+                 (not automation_blocker_boolean and states(automation_blocker) == 'off') }}
+          - condition: template
+            value_template: >
+              {% if 'Always' == elevation %} true {% else %}
+              {% set sun_elevation = state_attr('sun.sun', 'elevation') %}
+              {% if sun_elevation is none %} false {% else %}
+              {% if (sun_elevation > elevation_adjustment and 'Above horizon' == elevation)
+                    or (sun_elevation <= elevation_adjustment and 'Below horizon' == elevation) %}
+                true
+              {% else %} false {% endif %} {% endif %} {% endif %}
+          - condition: numeric_state
+            entity_id: !input luminance_sensor
+            below: !input luminance_required
         sequence:
+          - condition: time
+            after: !input time_default_start
+            before: !input time_default_end
           - service: light.turn_on
             target: !input light_target
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'off' }}"
-          ...
+          - condition: template
+            value_template: >
+              {{ automation_blocker is not defined or
+                 (automation_blocker_boolean and states(automation_blocker) == 'on') or
+                 (not automation_blocker_boolean and states(automation_blocker) == 'off') }}
+          - condition: template
+            value_template: >
+              {% if 'Always' == elevation %} true {% else %}
+              {% set sun_elevation = state_attr('sun.sun', 'elevation') %}
+              {% if sun_elevation is none %} false {% else %}
+              {% if (sun_elevation > elevation_adjustment and 'Above horizon' == elevation)
+                    or (sun_elevation <= elevation_adjustment and 'Below horizon' == elevation) %}
+                true
+              {% else %} false {% endif %} {% endif %} {% endif %}
         sequence:
           - choose:
               - conditions:
