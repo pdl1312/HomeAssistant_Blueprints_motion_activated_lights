@@ -1,8 +1,8 @@
 blueprint:
-  name: Advanced Custom Motion Sensor (ON Blocker Only)
+  name: Advanced Custom Motion Sensor (ON/OFF Blocker)
   description: >
-    Modified version of advanced motion sensor. Blocks motion ON using input_boolean,
-    but allows OFF to always run.
+    Modified version of advanced motion sensor. Blocks motion ON and OFF using input_boolean.
+    ON and OFF are both blocked if the input_boolean is ON.
   domain: automation
   input:
     motion_entity:
@@ -71,22 +71,12 @@ blueprint:
           max: 90
           unit_of_measurement: degrees
     automation_blocker:
-      name: Block ON if this is in state
+      name: Blocker for both ON and OFF
       default:
       selector:
         entity: {}
     automation_blocker_boolean:
-      name: Block ON when boolean is ON (true) or OFF (false)?
-      default: false
-      selector:
-        boolean: {}
-    motion_off_blocker:
-      name: Motion OFF Blocker (Optional)
-      default:
-      selector:
-        entity: {}
-    motion_off_blocker_boolean:
-      name: Block OFF when this is in state
+      name: Block when boolean is ON (true) or OFF (false)?
       default: false
       selector:
         boolean: {}
@@ -112,8 +102,6 @@ variables:
   scene_ambient: !input scene_ambient
   automation_blocker: !input automation_blocker
   automation_blocker_boolean: !input automation_blocker_boolean
-  motion_off_blocker: !input motion_off_blocker
-  motion_off_blocker_boolean: !input motion_off_blocker_boolean
   elevation: !input elevation
   elevation_adjustment: !input elevation_adjustment
   motion_entity: !input motion_entity
@@ -134,55 +122,8 @@ action:
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'on' }}"
-          - condition: or
-            conditions:
-              - "{{ automation_blocker == none }}"
-              - "{{ automation_blocker_boolean and states[automation_blocker].state == 'on' }}"
-              - "{{ not automation_blocker_boolean and states[automation_blocker].state == 'off' }}"
           - condition: template
             value_template: >
-              {% if 'Always' == elevation %} true {% else %}
-              {% set sun_elevation = state_attr('sun.sun', 'elevation') %}
-              {% if sun_elevation is none %} false {% else %}
-              {% if (sun_elevation > elevation_adjustment and 'Above horizon' == elevation)
-                    or (sun_elevation <= elevation_adjustment and 'Below horizon' == elevation) %}
-                true
-              {% else %} false {% endif %} {% endif %} {% endif %}
-          - condition: numeric_state
-            entity_id: !input luminance_sensor
-            below: !input luminance_required
-        sequence:
-          - condition: time
-            after: !input time_default_start
-            before: !input time_default_end
-          - service: light.turn_on
-            target: !input light_target
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.to_state.state == 'off' }}"
-          - condition: or
-            conditions:
-              - "{{ motion_off_blocker == none }}"
-              - "{{ motion_off_blocker_boolean and states[motion_off_blocker].state == 'on' }}"
-              - "{{ not motion_off_blocker_boolean and states[motion_off_blocker].state == 'off' }}"
-          - condition: template
-            value_template: >
-              {% if 'Always' == elevation %} true {% else %}
-              {% set sun_elevation = state_attr('sun.sun', 'elevation') %}
-              {% if sun_elevation is none %} false {% else %}
-              {% if (sun_elevation > elevation_adjustment and 'Above horizon' == elevation)
-                    or (sun_elevation <= elevation_adjustment and 'Below horizon' == elevation) %}
-                true
-              {% else %} false {% endif %} {% endif %} {% endif %}
-        sequence:
-          - choose:
-              - conditions:
-                  - "{{ scene_ambient != 'scene.none' }}"
-                  - condition: time
-                    after: !input time_scene_ambient_start
-                    before: !input time_scene_ambient_end
-                sequence:
-                  - scene: !input scene_ambient
-            default:
-              - service: light.turn_off
-                target: !input light_target
+              {{ automation_blocker is not defined or
+                 states(automation_blocker) in ['unavailable', 'unknown'] or
+                 states(automation_blocker) == 'off' }}
